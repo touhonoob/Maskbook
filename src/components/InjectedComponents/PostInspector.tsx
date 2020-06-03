@@ -12,6 +12,8 @@ import { useValueRef } from '../../utils/hooks/useValueRef'
 import { debugModeSetting } from '../shared-settings/settings'
 import { DebugList } from '../DebugModeUI/DebugList'
 import type { TypedMessage } from '../../extension/background-script/CryptoServices/utils'
+import { GitCoinConfig } from '../../plugins/Gitcoin/define'
+import { PluginUI } from '../../plugins/plugin'
 
 export interface PostInspectorProps {
     onDecrypted(post: TypedMessage, raw: string): void
@@ -34,6 +36,7 @@ export function PostInspector(props: PostInspectorProps) {
     const type = {
         encryptedPost: deconstructPayload(post, getActivatedUI().payloadDecoder),
         provePost: decodeAsPublicKey,
+        extraCanvas: post.toLowerCase().includes('gitcoin'),
     }
 
     const { value: sharedListOfPost } = useAsync(async () => {
@@ -68,47 +71,59 @@ export function PostInspector(props: PostInspectorProps) {
                 ? type.encryptedPost.AESKeyEncrypted
                 : type.encryptedPost.ownersAESKeyEncrypted
         const DecryptPostX = props.DecryptPostComponent || DecryptPost
-        return (
-            <>
-                <DecryptPostX
-                    onDecrypted={props.onDecrypted}
-                    requestAppendRecipients={
-                        // Version -40 is leaking info
-                        // So should not create new data on version -40
-                        type.encryptedPost.version === -40
-                            ? undefined
-                            : async (people) => {
-                                  setAlreadySelectedPreviously(alreadySelectedPreviously.concat(people))
-                                  return Services.Crypto.appendShareTarget(
-                                      version,
-                                      ownersAESKeyEncrypted,
-                                      iv,
-                                      people.map((x) => x.identifier),
-                                      whoAmI!.identifier,
-                                      { type: 'direct', at: new Date() },
-                                  )
-                              }
-                    }
-                    alreadySelectedPreviously={alreadySelectedPreviously}
-                    profiles={people}
-                    postId={postId}
-                    encryptedText={post}
-                    whoAmI={whoAmI ? whoAmI.identifier : ProfileIdentifier.unknown}
-                    postBy={postBy}
-                    {...props.DecryptPostProps}
-                />
-                {debugInfo}
-            </>
+        return withAdditionalContent(
+            <DecryptPostX
+                onDecrypted={props.onDecrypted}
+                requestAppendRecipients={
+                    // Version -40 is leaking info
+                    // So should not create new data on version -40
+                    type.encryptedPost.version === -40
+                        ? undefined
+                        : async (people) => {
+                              setAlreadySelectedPreviously(alreadySelectedPreviously.concat(people))
+                              return Services.Crypto.appendShareTarget(
+                                  version,
+                                  ownersAESKeyEncrypted,
+                                  iv,
+                                  people.map((x) => x.identifier),
+                                  whoAmI!.identifier,
+                                  { type: 'direct', at: new Date() },
+                              )
+                          }
+                }
+                alreadySelectedPreviously={alreadySelectedPreviously}
+                profiles={people}
+                postId={postId}
+                encryptedText={post}
+                whoAmI={whoAmI ? whoAmI.identifier : ProfileIdentifier.unknown}
+                postBy={postBy}
+                {...props.DecryptPostProps}
+            />,
         )
     } else if (type.provePost.length) {
         const AddToKeyStoreX = props.AddToKeyStoreComponent || AddToKeyStore
         if (!AddToKeyStoreX) return null
+        return withAdditionalContent(<AddToKeyStoreX postBy={postBy} provePost={post} {...props.AddToKeyStoreProps} />)
+    }
+    return withAdditionalContent(null)
+    function withAdditionalContent(x: JSX.Element | null) {
         return (
             <>
-                <AddToKeyStoreX postBy={postBy} provePost={post} {...props.AddToKeyStoreProps} />
+                {x}
+                <PluginPostInspector post={post} />
                 {debugInfo}
             </>
         )
     }
-    return debugInfo
+}
+function PluginPostInspector(props: { post: string }) {
+    return (
+        <>
+            {[...PluginUI.values()]
+                .filter((x) => x.shouldActivateInPostInspector(props.post))
+                .map((X) => (
+                    <X.PostInspectorComponent key={X.identifier} {...props} />
+                ))}
+        </>
+    )
 }

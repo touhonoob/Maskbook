@@ -10,6 +10,8 @@ import { InitGroupsValueRef } from '../../../social-network/defaults/GroupsValue
 import { twitterUrl } from '../utils/url'
 import { PreDefinedVirtualGroupNames } from '../../../database/type'
 import { twitterUICustomUI, startWatchThemeColor } from './custom'
+import { notifyPermissionUpdate } from '../../../utils/permissions'
+import { injectMaskbookIconToProfile, injectMaskbookIconIntoFloatingProfileCard } from './injectMaskbookIcon'
 
 export const instanceOfTwitterUI = defineSocialNetworkUI({
     ...sharedSettings,
@@ -19,12 +21,20 @@ export const instanceOfTwitterUI = defineSocialNetworkUI({
     ...twitterUICustomUI,
     i18nOverwrite: {
         en: {
-            additional_post_box__encrypted_post_pre:
-                '#Maskbook ([I:b])\nDecrypt this tweet with maskbook.com @realMaskbook.\n—§— /* {{encrypted}} */',
+            additional_post_box__encrypted_post_pre: [
+                'This tweet is encrypted with Maskbook (@realmaskbook).',
+                'Install maskbook.com to decrypt it. 📮🔑',
+                '#Maskbook',
+                '🚫Do not click this link. 🔐{{encrypted}}🔐',
+            ].join('\n\n'),
         },
         zh: {
-            additional_post_box__encrypted_post_pre:
-                '#Maskbook ([I:b])\n使用 maskbook.com @realMaskbook 解密这条推文。\n—§— /* {{encrypted}} */',
+            additional_post_box__encrypted_post_pre: [
+                '此推文已被 Maskbook（@realmaskbook）加密。',
+                '請安裝 maskbook.com 進行解密。📮🔑',
+                '#Maskbook',
+                '🚫請不要點擊此連結。🔐{{encrypted}}🔐',
+            ].join('\n\n'),
         },
     },
     init: (env, pref) => {
@@ -37,6 +47,8 @@ export const instanceOfTwitterUI = defineSocialNetworkUI({
             PreDefinedVirtualGroupNames.following,
         ])
         InitMyIdentitiesValueRef(instanceOfTwitterUI, twitterUrl.hostIdentifier)
+        injectMaskbookIconToProfile()
+        injectMaskbookIconIntoFloatingProfileCard()
     },
     shouldActivate(location: Location | URL = globalThis.location) {
         return location.hostname.endsWith(twitterUrl.hostIdentifier)
@@ -45,9 +57,11 @@ export const instanceOfTwitterUI = defineSocialNetworkUI({
     requestPermission() {
         // TODO: wait for webextension-shim to support <all_urls> in permission.
         if (webpackEnv.target === 'WKWebview') return Promise.resolve(true)
-        return browser.permissions.request({
-            origins: [`${twitterUrl.hostLeadingUrl}/*`, `${twitterUrl.hostLeadingUrlMobile}/*`],
-        })
+        return browser.permissions
+            .request({
+                origins: [`${twitterUrl.hostLeadingUrl}/*`, `${twitterUrl.hostLeadingUrlMobile}/*`],
+            })
+            .then(notifyPermissionUpdate)
     },
     setupAccount: () => {
         instanceOfTwitterUI.requestPermission().then((granted) => {

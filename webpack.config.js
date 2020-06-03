@@ -6,6 +6,7 @@ const WebpackNotifierPlugin = require('webpack-notifier')
 const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin')
 const ForkTsCheckerNotifierWebpackPlugin = require('fork-ts-checker-notifier-webpack-plugin')
 const git = require('@nice-labs/git-rev').default
+const Terser = require('terser-webpack-plugin')
 
 const src = (file) => path.join(__dirname, file)
 /**
@@ -55,6 +56,7 @@ const calcArgs = (argv) => ({
     ReproducibleBuild: argv['reproducible-build'],
 })
 
+const CopyPlugin = require('copy-webpack-plugin')
 /**
  * @param {object} argvEnv
  * @returns {import("webpack").Configuration}
@@ -72,6 +74,33 @@ module.exports = (argvEnv, argv) => {
 
     const dist = env === 'production' ? src('./build') : src('./dist')
 
+    const gitInfo = () => {
+        const reproducible = new webpack.EnvironmentPlugin({
+            BUILD_DATE: new Date(0).toISOString(),
+            VERSION: require('./package.json').version + '-reproducible',
+            TAG_NAME: 'N/A',
+            COMMIT_HASH: 'N/A',
+            COMMIT_DATE: 'N/A',
+            REMOTE_URL: 'N/A',
+            BRANCH_NAME: 'N/A',
+            DIRTY: 'N/A',
+            TAG_DIRTY: 'N/A',
+        })
+        if (target.ReproducibleBuild) return reproducible
+        if (git.isRepository())
+            return new webpack.EnvironmentPlugin({
+                BUILD_DATE: new Date().toISOString(),
+                VERSION: git.describe('--dirty'),
+                TAG_NAME: git.tag(),
+                COMMIT_HASH: git.commitHash(),
+                COMMIT_DATE: git.commitDate().toISOString(),
+                REMOTE_URL: git.remoteURL(),
+                BRANCH_NAME: git.branchName(),
+                DIRTY: git.isDirty(),
+                TAG_DIRTY: git.isTagDirty(),
+            })
+        return reproducible
+    }
     /** @type {import('webpack').Configuration} */
     const config = {
         mode: env,
@@ -94,19 +123,7 @@ module.exports = (argvEnv, argv) => {
             new webpack.EnvironmentPlugin({
                 NODE_ENV: env,
             }),
-            target.ReproducibleBuild
-                ? undefined
-                : new webpack.EnvironmentPlugin({
-                      BUILD_DATE: new Date().toISOString(),
-                      VERSION: git.describe('--dirty'),
-                      TAG_NAME: git.tag(),
-                      COMMIT_HASH: git.commitHash(),
-                      COMMIT_DATE: git.commitDate().toISOString(),
-                      REMOTE_URL: git.remoteURL(),
-                      BRANCH_NAME: git.branchName(),
-                      DIRTY: git.isDirty(),
-                      TAG_DIRTY: git.isTagDirty(),
-                  }),
+            gitInfo(),
             // The following plugins are from react-dev-utils. let me know if any one need it.
             // WatchMissingNodeModulesPlugin
             // ModuleNotFoundPlugin
@@ -197,7 +214,7 @@ module.exports = (argvEnv, argv) => {
 
     // The background.js is too big to analyzed by the Firefox Addon's linter.
     if (target.Firefox && env === 'production') {
-        const TerserPlugin = require('terser-webpack-plugin')
+        const TerserPlugin = Terser
         config.plugins.push(new TerserPlugin())
     }
     // Loading debuggers
@@ -233,7 +250,7 @@ module.exports = (argvEnv, argv) => {
         let buildTarget = undefined
         /** @type {'android' | 'desktop' | 'GeckoView' | undefined} */
         let firefoxVariant = undefined
-        /** @type {'app' | 'browser'} */
+        /** @type {'app' | 'browser' | 'facebookApp'} */
         let genericTarget = 'browser'
         if (target.Chromium) buildTarget = 'Chromium'
         if (target.Firefox) buildTarget = 'Firefox'
@@ -297,7 +314,9 @@ module.exports = (argvEnv, argv) => {
 
     // Write files to /public
     config.plugins.push(
-        new (require('copy-webpack-plugin'))([{ from: publicDir, to: dist }], { ignore: ['index.html'] }),
+        new CopyPlugin({
+            patterns: [{ from: publicDir, to: dist, globOptions: { ignore: ['index.html'] } }],
+        }),
     )
     if (!fs.existsSync(publicPolyfill)) {
         fs.mkdirSync(publicPolyfill)

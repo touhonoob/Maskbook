@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react'
+import React, { useState, useCallback } from 'react'
 import {
     makeStyles,
     DialogTitle,
@@ -42,6 +42,7 @@ import BigNumber from 'bignumber.js'
 import { useWalletDataSource, useSelectWallet } from '../../../shared/useWallet'
 import { WalletSelect } from '../../../shared/WalletSelect'
 import { TokenSelect } from '../../../shared/TokenSelect'
+import { RedPacketMetaKey } from '../../RedPacketMetaKey'
 
 interface RedPacketDialogProps
     extends withClasses<
@@ -109,7 +110,7 @@ function NewPacketUI(props: RedPacketDialogProps & NewPacketProps) {
 
     const rinkebyNetwork = useValueRef(debugModeSetting)
 
-    const useSelectWalletResult = useSelectWallet(onRequireNewWallet, wallets, tokens)
+    const useSelectWalletResult = useSelectWallet(wallets, tokens, onRequireNewWallet)
     const {
         erc20Balance,
         ethBalance,
@@ -354,7 +355,7 @@ export default function RedPacketDialog(props: RedPacketDialogProps) {
         },
         [tabs],
     )
-    const [wallets, tokens] = useWalletDataSource()
+    const [wallets, tokens, onRequireNewWallet] = useWalletDataSource()
 
     const [redPacket, setRedPacket] = React.useState<RedPacketRecord[]>([])
     const [justCreatedRedPacket, setJustCreatedRedPacket] = React.useState<RedPacketRecord | undefined>(undefined)
@@ -384,7 +385,7 @@ export default function RedPacketDialog(props: RedPacketDialogProps) {
     const insertRedPacket = (payload?: RedPacketJSONPayload | null) => {
         const ref = getActivatedUI().typedMessageMetadata
         const next = new Map(ref.value.entries())
-        payload ? next.set('com.maskbook.red_packet:1', payload) : next.delete('com.maskbook.red_packet:1')
+        payload ? next.set(RedPacketMetaKey, payload) : next.delete(RedPacketMetaKey)
         ref.value = next
         props.onConfirm(payload)
     }
@@ -393,7 +394,7 @@ export default function RedPacketDialog(props: RedPacketDialogProps) {
         <RedPacketDialogUI
             {...props}
             tab={tabs}
-            onRequireNewWallet={() => Services.Welcome.openOptionsPage('/wallets/error?reason=nowallet')}
+            onRequireNewWallet={onRequireNewWallet}
             newRedPacketCreatorName={useCurrentIdentity()?.linkedPersona?.nickname}
             wallets={wallets}
             tokens={tokens}

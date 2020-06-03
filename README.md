@@ -36,10 +36,11 @@ For general introductions, see [Maskbook.com](https://maskbook.com/).
 
 ## Donation
 
-Help us by donating us by:
+Help us by donating us:
 
 -   Bitcoin: `3PRrXj1HTXDc4j9SCQZ6hovpa74iimqtgX`
 -   Ethereum: `0xD71c7150962fd484a4291a193c85426Df9EaABbB`
+-   Gitcoin (All erc20): [Maskbook](https://gitcoin.co/grants/159/maskbook-surrender-no-privacy-to-youknowwho-eg-fac)
 
 ## Documentation for developers
 

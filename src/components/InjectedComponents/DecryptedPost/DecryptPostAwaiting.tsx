@@ -12,11 +12,13 @@ export const DecryptPostAwaiting = React.memo(function DecryptPostAwaiting(props
         finding_post_key: t('decrypted_postbox_decrypting_finding_post_key'),
         finding_person_public_key: t('decrypted_postbox_decrypting_finding_person_key'),
         init: t('decrypted_postbox_decrypting'),
+        intermediate_success: 'unreachable case. it should display success UI',
         undefined: t('decrypted_postbox_decrypting'),
     } as const
     return (
         <AdditionalContent
-            header={key[(props.type && props.type.progress) || 'undefined']}
+            title={key[(props.type && props.type.progress) || 'undefined']}
+            progress
             {...props.AdditionalContentProps}
         />
     )

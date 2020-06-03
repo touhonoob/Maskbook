@@ -34,6 +34,9 @@ import { PortalShadowRoot } from '../../../../utils/jss/ShadowRootPortal'
 import { useI18N } from '../../../../utils/i18n-next-ui'
 import ShadowRootDialog from '../../../../utils/jss/ShadowRootDialog'
 import { getPostUrl } from '../../../../social-network/utils/getPostUrl'
+import { RedPacketMetaKey } from '../../RedPacketMetaKey'
+import type { PluginSuccessDecryptionComponentProps } from '../../../plugin'
+import { useWalletDataSource } from '../../../shared/useWallet'
 
 const useStyles = makeStyles((theme) =>
     createStyles({
@@ -45,23 +48,21 @@ const useStyles = makeStyles((theme) =>
 
 interface RedPacketInDecryptedPostProps
     extends withClasses<
-        | KeysInferFromUseStyles<typeof useStyles>
-        | 'dialog'
-        | 'backdrop'
-        | 'container'
-        | 'paper'
-        | 'input'
-        | 'header'
-        | 'content'
-        | 'actions'
-        | 'close'
-        | 'button'
-        | 'label'
-        | 'title'
-    > {
-    message: TypedMessage
-    postIdentifier?: PostIdentifier<ProfileIdentifier>
-}
+            | KeysInferFromUseStyles<typeof useStyles>
+            | 'dialog'
+            | 'backdrop'
+            | 'container'
+            | 'paper'
+            | 'input'
+            | 'header'
+            | 'content'
+            | 'actions'
+            | 'close'
+            | 'button'
+            | 'label'
+            | 'title'
+        >,
+        PluginSuccessDecryptionComponentProps {}
 
 export default function RedPacketInDecryptedPost(props: RedPacketInDecryptedPostProps) {
     const [loading, setLoading] = React.useState(false)
@@ -89,15 +90,16 @@ export default function RedPacketInDecryptedPost(props: RedPacketInDecryptedPost
             .catch((e) => Services.Welcome.openOptionsPage(`/wallets/error?reason=${e.message}`))
             .finally(() => setLoading(false))
     }
+    const [wallets, tokens, onRequireNewWallet] = useWalletDataSource()
 
     const onClick = async (state: RedPacketStatus, rpid: RedPacketRecord['red_packet_id']) => {
         if (!rpid) return
         if (state === 'incoming' || state === 'normal') {
             setLoading(true)
             try {
-                const [wallets] = await Services.Plugin.invokePlugin('maskbook.wallet', 'getWallets')
+                if (wallets === 'loading') throw new Error('Loading')
                 if (!wallets[0]) {
-                    Services.Welcome.openOptionsPage('/wallets/error?reason=nowallet')
+                    onRequireNewWallet()
                     throw new Error('Claim failed')
                 }
                 if (wallets.length > 1) setClaiming({ rpid, wallets })
@@ -139,7 +141,7 @@ export function RedPacketInDecryptedPostCard(
     const storybookDebugging: boolean = !!process.env.STORYBOOK
     /* without redpacket */
     const jsx = message
-        ? withMetadata(message.meta, 'com.maskbook.red_packet:1', (r) => (
+        ? withMetadata(message.meta, RedPacketMetaKey, (r) => (
               <MaskbookPluginWrapper width={400} pluginName="Red Packet">
                   {webpackEnv.target === 'WKWebview' ? (
                       <span>{t('feature_redpacket_not_supported')}</span>
